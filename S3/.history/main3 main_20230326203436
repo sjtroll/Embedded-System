@@ -1,0 +1,80 @@
+/**
+ ******************************************************************************
+ * @file    repo/s3/main.c
+ * @author  Sejin Son
+ * @date    06042022
+ * @brief   Hamming Encoder/Decoder with Console and IR Remote Control (Stage 3)
+ ******************************************************************************
+ *
+ */
+
+#include "board.h"
+#include "processor_hal.h"
+#include "debug_log.h"
+#include "s4451119_hamming.h"
+#include "s4451119_lta1000g.h"
+#include "s4451119_joystick.h"
+#include "s4451119_keypad.h"
+
+
+
+void hardware_init();
+
+/* States used */
+#define S0  0
+#define S1  1
+#define S2  2
+#define S3  3
+#define S4  4
+
+void main(void) {
+
+	HAL_Init();	
+	hardware_init();
+	s4451119_reg_lta1000g_init();
+	s4451119_reg_keypad_init();
+  	int prevTick;
+  	int currentState = S0;
+	uint8_t decodedWord;
+
+
+
+    
+	uint16_t unencodedbyte = 0x3647;
+
+	/* Main processing loop */
+    while (1) {
+
+		decodedWord = s4451119_lib_hamming_byte_decode(unencodedbyte);
+		//debug_log("DecodedWord: %X\r\n", decodedWord);
+
+		// if ((HAL_GetTick() - prevTick) >= 1000) {
+      	// 	currentState = s4451119_reg_keypad_fsmprocessing(currentState);
+      	// 	prevTick =  HAL_GetTick();
+    	// }
+		HAL_Delay(1000);	//Delay function
+	}
+
+}
+
+/*
+ * Initialise Hardware
+ */
+void hardware_init() {
+	/* Enable GPIO for pushbutton */
+    __GPIOA_CLK_ENABLE();
+
+
+  /* Enable pushbutton input */
+  	GPIOA->OSPEEDR |= (GPIO_SPEED_FAST << 3);	//Set fast speed.
+	GPIOA->PUPDR &= ~(0x03 << (3 * 2));			//Clear bits for no push/pull
+	GPIOA->MODER &= ~(0x03 << (3 * 2));			//Clear bits for input mode
+
+	BRD_LEDInit();		//Initialise Blue LED
+	
+	BRD_debuguart_init();  //Initialise UART for debug log output
+
+	// Turn off LED
+	BRD_LEDGreenOff();
+
+}

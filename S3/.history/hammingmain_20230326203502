@@ -1,0 +1,143 @@
+/**
+ **************************************************************
+ * @file mylib/s4451119_hamming.c
+ * @author Sejin Son - 44511199
+ * @date 11042022
+ * @brief The Hamming LIB provides hamming byte encode, byte decode and half byte encode functions
+ * REFERENCE: DON'T JUST COPY THIS BLINDLY.pdf 
+ ***************************************************************
+ * EXTERNAL FUNCTIONS 
+ ***************************************************************
+ * s4451119_lib_hamming_byte_encode(unsigned char in) - encoding hamming (7,4) words given, 8-bit and output 16 bit
+ * s4451119_lib_hamming_hbyte_decode(unsigned char in) - decoding hamming (7,4) words given, 8-bit and output 4 bit
+ *************************************************************** 
+ */
+
+#include "board.h"
+#include "processor_hal.h"
+#include "debug_log.h"
+#include "s4451119_lta1000g.h"
+
+
+unsigned char s4451119_lib_hamming_hbyte_encode(unsigned char in);
+unsigned char s4451119_lib_hamming_hbyte_decode(unsigned char in);
+
+
+/* 
+ * @breif	Implement Hamming Code on a full byte of input, This means that 16-bits out output is needed
+ * @param inputWord - Input word for encoding, 8-bit length.
+ * @return out - encoded word by two half-byte encoding, 16-bit length
+ */
+unsigned short s4451119_lib_hamming_byte_encode(unsigned char inputWord) {
+    unsigned short encodedWord;
+
+	/* first encode D0..D3 (first 4 bits),
+	 * then D4..D7 (second 4 bits).
+	 */
+	encodedWord = s4451119_lib_hamming_hbyte_encode(inputWord & 0xF) | (s4451119_lib_hamming_hbyte_encode(inputWord >> 4) << 8);
+	return(encodedWord);
+}
+
+/* 
+ * @breif - Implement Hamming Code on a half byte of input, take 4-bit to make 8 bit (4 dbit + 3 hbit + 1 pbit)
+ * @param halfInput - half byte of inputWord (4-bit) 
+ * @return out - encoded word by hamming (7,4), 8-bit length
+ */
+unsigned char s4451119_lib_hamming_hbyte_encode(unsigned char halfInput) {
+    unsigned char d0, d1, d2, d3;
+	unsigned char p0 = 0, h0, h1, h2;
+	unsigned char out;
+
+	/* extract bits */
+	d0 = !!(halfInput & 0x1);
+	d1 = !!(halfInput & 0x2);
+	d2 = !!(halfInput & 0x4);
+	d3 = !!(halfInput & 0x8);
+	
+	/* calculate hamming parity bits */
+	h0 = d1 ^ d2 ^ d3;
+	h1 = d0 ^ d2 ^ d3;
+	h2 = d0 ^ d1 ^ d3;
+
+	/* generate out byte without parity bit P0 */
+	out = (h0 << 1) | (h1 << 2) | (h2 << 3) |
+		(d0 << 4) | (d1 << 5) | (d2 << 6) | (d3 << 7);
+
+	/* calculate even parity bit */
+	for (unsigned char z = 1; z<8; z++)
+		p0 = p0 ^ !!(out & (1 << z));
+
+	out |= p0;
+
+	return(out);
+
+}
+
+unsigned char s4451119_lib_hamming_byte_decode(unsigned short inputWord) {
+	unsigned short decodedWord;
+    unsigned char firstHalf = s4451119_lib_hamming_hbyte_decode(inputWord & 0xFF);
+    unsigned char secondHalf = s4451119_lib_hamming_hbyte_decode((inputWord >> 8) & 0xFF);
+
+	// debug_log("47: %X\r\n", 0x3647 & 0xFF);
+	// debug_log("36: %X\r\n", (0x3647 >> 8) & 0xFF);
+
+	debug_log("firstHalf: %X\r\n", s4451119_lib_hamming_hbyte_decode(0x47));
+	debug_log("firstHalf: %X\r\n", s4451119_lib_hamming_hbyte_decode(0x36));
+
+	decodedWord = (secondHalf) << 4 | (firstHalf);
+    return(decodedWord);
+}
+
+
+
+unsigned char s4451119_lib_hamming_hbyte_decode(unsigned char codedWord) {
+
+	uint8_t d0,d1,d2,d3,h0,h1,h2,p0,pd;
+	uint8_t s0,s1,s2;
+	
+
+	/* extract bits from the word to calculate syndrome matrix for encoding */
+	p0 = !!(codedWord & 0x1);
+	h0 = !!(codedWord & 0x2);
+	h1 = !!(codedWord & 0x4);
+	h2 = !!(codedWord& 0x8);
+
+	unsigned char out = 0;
+    while (out <= 0xF) {
+		d0 = !!(out & 0x1);
+		d1 = !!(out & 0x2);
+		d2 = !!(out & 0x4);
+		d3 = !!(out & 0x8);
+
+		s0 = h0 ^ d0 ^ d1 ^ d2;
+		s1 = h1 ^ d0 ^ d1 ^ d3;
+		s2 = h2 ^ d0 ^ d2 ^ d3;	  
+		/* return output only if no error comes out from syndrome matrix */
+     	if (s0 + s1 + s2 == 0) {
+			pd = d0 ^ d1 ^ d2 ^ d3 ^ h0 ^ h1 ^ h2;
+			if (pd == p0) {
+				break;
+			}
+		}
+		out++;
+	}
+
+	return out;
+}
+
+
+
+int s4451119_lib_hamming_parity_error(unsigned char value) {
+    unsigned char calculated_parity = 0;
+    unsigned char received_parity = !!(value & 0x1);
+    
+    // Calculate even parity
+    for (unsigned char z = 1; z < 8; z++) {
+        calculated_parity ^= !!(value & (1 << z));
+    }
+    
+    return received_parity != calculated_parity;
+}
+
+
+

@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "LIGHTBAR.C": "cpp",
+        "HAMMING.C": "cpp",
+        "PANTILT.C": "cpp",
+        "JOYSTICK.C": "cpp",
+        "MAINS1.C": "cpp",
+        "MAINS2.C": "cpp",
+        "MAKEFILE.S3.C": "cpp",
+        "MAINS3.C": "cpp",
+        "LIGHTBARORIGINAL.C": "cpp"
+    }
+}
